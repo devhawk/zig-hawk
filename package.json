@@ -9,13 +9,23 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:**/*.zig"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
+    "taskDefinitions": [
       {
-        "command": "zig-hawk.helloWorld",
-        "title": "Hello World"
+        "type": "zig-hawk",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The task to run"
+          }
+        }
       }
     ]
   },
