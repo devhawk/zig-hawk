@@ -19,12 +19,22 @@
       {
         "type": "zig-hawk",
         "required": [
-          "task"
+          "step"
         ],
         "properties": {
-          "task": {
+          "step": {
             "type": "string",
-            "description": "The task to run"
+            "description": "The step to run"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string",
+                "description": "Current working directory for the task",
+                "default": "${workspaceFolder}"
+              }
+            }
           }
         }
       }

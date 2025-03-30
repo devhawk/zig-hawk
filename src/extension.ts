@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as cp from 'node:child_process';
-import * as path from 'node:path';
 
 function exec(command: string, options: cp.ExecOptions): Promise<{ stdout: string; stderr: string }> {
 	return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -22,12 +21,12 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() { }
 
 const regexBuildSteps = /^\s*(\w*)\s*(\(default\))?\s*(.*)$/gm;
 
 interface BuildStep {
-	name: string; 
+	name: string;
 	default: boolean;
 	description: string;
 }
@@ -35,7 +34,7 @@ interface BuildStep {
 async function getBuildSteps(cwd: string) {
 	channel.info(`Getting build steps for: ${cwd}`);
 	const steps = new Array<BuildStep>();
-	const {stdout} = await exec("zig build --list-steps", { cwd });
+	const { stdout } = await exec("zig build --list-steps", { cwd });
 	for (const match of stdout.matchAll(regexBuildSteps)) {
 		const name = match[1].trim();
 		if (name) {
@@ -48,22 +47,12 @@ async function getBuildSteps(cwd: string) {
 	return steps;
 }
 
-// async function getAllBuildSteps(): Promise<{ cwd: string; steps: BuildStep[]; }[]> {
-// 	// Find all `build.zig` files in the workspace
-// 	const files = await vscode.workspace.findFiles('**/build.zig');
-// 	const all = new Array<{ cwd: string; steps: BuildStep[]; }>();
-// 	for (const file of files) {
-// 		const cwd = path.dirname(file.fsPath);
-// 		const steps = await getBuildSteps(cwd);
-// 		if (steps.length > 0) {
-// 			all.push({cwd, steps});
-// 		}
-// 	}
-// 	return all;
-// }
-
-interface ZigTaskDefinition extends vscode.TaskDefinition {
-	task: string;
+interface ZigTaskDefinition {
+	type: 'zig-hawk';
+	step: string;
+	options?: {
+		cwd?: string;
+	}
 }
 
 class ZigTaskProvider implements vscode.TaskProvider {
@@ -75,9 +64,14 @@ class ZigTaskProvider implements vscode.TaskProvider {
 			if (!cwd) { continue; }
 			const steps = await getBuildSteps(cwd);
 			for (const step of steps) {
-				const args = step.default ? ['build'] : ['build', step.name];
-				const execution = new vscode.ProcessExecution("zig", args, {cwd});
-				const task = new vscode.Task({ type: "zig-hawk", task: step.name }, folder, step.name, "zig-hawk", execution);
+				const execution = new vscode.ProcessExecution("zig", ['build', step.name], { cwd });
+				const def: ZigTaskDefinition = {
+					type: "zig-hawk",
+					step: step.name,
+					options: { cwd }
+				};
+				const task = new vscode.Task(def, folder, step.name, "zig-hawk", execution);
+				task.detail = step.description;
 				if (step.default) {
 					task.group = vscode.TaskGroup.Build;
 				}
@@ -88,6 +82,8 @@ class ZigTaskProvider implements vscode.TaskProvider {
 	}
 
 	resolveTask(task: vscode.Task, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Task> {
+		const { step, options } = task.definition as ZigTaskDefinition;
+		task.execution = new vscode.ProcessExecution("zig", ['build', step], { cwd: options?.cwd });
 		return task;
 	}
 }
