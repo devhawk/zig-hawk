@@ -50,40 +50,50 @@ async function getBuildSteps(cwd: string) {
 interface ZigTaskDefinition {
 	type: 'zig-hawk';
 	step: string;
-	options?: {
-		cwd?: string;
-	}
+	args?: string[]; 
+	options?: Pick<vscode.ProcessExecutionOptions, "cwd">;
 }
 
 class ZigTaskProvider implements vscode.TaskProvider {
-	async provideTasks(token: vscode.CancellationToken): Promise<vscode.Task[]> {
+	async provideTasks(token: vscode.CancellationToken) {
+		const folders = vscode.workspace.workspaceFolders;
+		if (!folders || folders.length === 0) { return undefined; }
+
+		const opened = vscode.window.activeTextEditor?.document?.uri;
+		const folder = (opened && vscode.workspace.getWorkspaceFolder(opened)) || folders[0];
+
 		const tasks = new Array<vscode.Task>();
-		const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
-		for (const folder of workspaceFolders) {
-			const cwd = folder.uri.fsPath;
-			if (!cwd) { continue; }
-			const steps = await getBuildSteps(cwd);
-			for (const step of steps) {
-				const execution = new vscode.ProcessExecution("zig", ['build', step.name], { cwd });
-				const def: ZigTaskDefinition = {
-					type: "zig-hawk",
-					step: step.name,
-					options: { cwd }
-				};
-				const task = new vscode.Task(def, folder, step.name, "zig-hawk", execution);
-				task.detail = step.description;
-				if (step.default) {
-					task.group = vscode.TaskGroup.Build;
-				}
-				tasks.push(task);
-			}
+		const steps = await getBuildSteps(folder.uri.fsPath);
+		for (const step of steps) {
+			const def: ZigTaskDefinition = {
+				type: "zig-hawk",
+				step: step.name,
+			};
+			const task = makeZigTask(def, folder);
+			task.detail = step.description; 
+			if (step.default) { task.group = vscode.TaskGroup.Build; }
+			tasks.push(task);
 		}
 		return tasks;
 	}
 
 	resolveTask(task: vscode.Task, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Task> {
-		const { step, options } = task.definition as ZigTaskDefinition;
-		task.execution = new vscode.ProcessExecution("zig", ['build', step], { cwd: options?.cwd });
-		return task;
+		return makeZigTask(task.definition as ZigTaskDefinition, task.scope ?? vscode.TaskScope.Workspace);
 	}
+}
+
+function makeZigTask(definition: ZigTaskDefinition, scope: vscode.TaskScope | vscode.WorkspaceFolder ) {
+
+	const cwd = definition.options?.cwd ?? (isWorkspaceFolder(scope) ? scope.uri.fsPath : undefined);
+	const args = ["build", definition.step]; 
+	if (definition.args && definition.args.length > 0) {
+		args.push('--', ...definition.args); 
+	}
+	const execution = new vscode.ProcessExecution("zig", args, { cwd });
+
+	return new vscode.Task(definition, scope, definition.step, "zig-hawk", execution);
+}
+
+function isWorkspaceFolder(scope: vscode.WorkspaceFolder | vscode.TaskScope): scope is vscode.WorkspaceFolder {
+	return typeof scope !== 'number' && 'uri' in scope;
 }

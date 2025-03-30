@@ -26,13 +26,20 @@
             "type": "string",
             "description": "The step to run"
           },
+          "args": {
+            "type": "array",
+            "description": "additional arguments to pass to the zig build <step> command",
+            "items": {
+              "type": "string"
+            }
+          },
           "options": {
             "type": "object",
+            "description": "additional command options",
             "properties": {
               "cwd": {
                 "type": "string",
-                "description": "Current working directory for the task",
-                "default": "${workspaceFolder}"
+                "description": "the current working directory of the zig build file. If omitted Code's current workspace root is used."
               }
             }
           }
