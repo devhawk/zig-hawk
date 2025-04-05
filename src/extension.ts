@@ -47,7 +47,7 @@ async function getBuildSteps(cwd: string) {
 	return steps;
 }
 
-interface ZigTaskDefinition {
+interface ZigTaskDefinition extends vscode.TaskDefinition {
 	type: 'zig-hawk';
 	step: string;
 	args?: string[]; 
@@ -83,7 +83,6 @@ class ZigTaskProvider implements vscode.TaskProvider {
 }
 
 function makeZigTask(definition: ZigTaskDefinition, scope: vscode.TaskScope | vscode.WorkspaceFolder ) {
-
 	const cwd = definition.options?.cwd ?? (isWorkspaceFolder(scope) ? scope.uri.fsPath : undefined);
 	const args = ["build", definition.step]; 
 	if (definition.args && definition.args.length > 0) {
@@ -91,7 +90,9 @@ function makeZigTask(definition: ZigTaskDefinition, scope: vscode.TaskScope | vs
 	}
 	const execution = new vscode.ProcessExecution("zig", args, { cwd });
 
-	return new vscode.Task(definition, scope, definition.step, "zig-hawk", execution);
+	const task = new vscode.Task(definition, scope, definition.step, "zig-hawk", execution);
+	task.problemMatchers = ["$zig-hawk"];
+	return task;
 }
 
 function isWorkspaceFolder(scope: vscode.WorkspaceFolder | vscode.TaskScope): scope is vscode.WorkspaceFolder {
